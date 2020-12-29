@@ -35,5 +35,55 @@ inputDF = (
     .schema(schema)
     .json(inputPath)
 )
+inputDF = inputDF.dropna()
+# inputDF.show()
 
-inputDF.show()
+actionsDF = (inputDF.groupBy(inputDF.action).count())
+actionsDF.cache()
+
+# Create temp table named 'iot_action_counts'
+actionsDF.createOrReplaceTempView("iot_action_counts")
+
+select_results = spark.sql("SELECT action, SUM(count) AS total_count FROM iot_action_counts group by action")
+# select_results.show()
+
+
+streamingDF = (
+  spark
+    .readStream
+    .schema(schema)
+    .option("maxFilesPerTrigger", 1)
+    .json(inputPath)
+)
+
+print("THE STREAMINGDF IS STREAMING {}".format(streamingDF.isStreaming))
+
+streamingDF.writeStream \
+    .format("console") \
+    .start()
+
+
+spark.streams.awaitAnyTermination()
+
+# streamingActionCountsDF = (
+#   streamingDF
+#     .groupBy(
+#       streamingDF.action
+#     )
+#     .count()
+# )
+#
+#
+# spark.conf.set("spark.sql.shuffle.partitions", "2")
+#
+# # View stream in real-time
+# query = (
+#   streamingActionCountsDF
+#     .writeStream
+#     .format("memory")
+#     .queryName("counts")
+#     .outputMode("complete")
+#     .start()
+# )
+
+
